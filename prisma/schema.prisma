@@ -1,0 +1,202 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  ADMIN
+  STUDENT
+}
+
+enum EventStatus {
+  DRAFT
+  PUBLISHED
+  CANCELLED
+  COMPLETED
+}
+
+enum RegistrationStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  INITIATED
+  SUCCESS
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  BKASH
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  studentId    String?  @unique
+  department   String?
+  email        String   @unique
+  phone        String?
+  password     String
+  role         UserRole @default(STUDENT)
+
+  clubId       String?
+  club         Club?    @relation("ClubAdmins", fields: [clubId], references: [id])
+
+  registrations Registration[]
+  attendances   Attendance[]
+  preference    StudentPreference?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([role])
+  @@index([clubId])
+}
+
+model StudentPreference {
+  id               String   @id @default(cuid())
+  userId           String   @unique  //studentID
+  hobbies          String[] // e.g. ["Photography", "Gaming", "Public Speaking"]
+  interests        String[] // e.g. ["Web Development", "AI/ML", "Music", "Robotics"]
+  preferredTags    String[] // e.g. ["Workshop", "Competition", "Seminar", "Hackathon"]
+  department       String?  // e.g. "CSE", "EEE", "BBA" (Department specific event match করার জন্য)
+  graduationYear   Int?     // e.g. 2026 (Junior/Senior level event filtering)
+  bio              String?  // e.g. "I love coding competitions and tech seminars"
+
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model Club {
+  id          String  @id 
+  name        String
+  description String?
+  profileImage String?
+  admin String @default("")
+
+  admins      User[]  @relation("ClubAdmins")
+  events      Event[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([name])
+}
+
+model Event {
+  id                 String      @id @default(cuid())
+  title              String
+  description        String?
+  category           String?   // e.g. "Tech", "Cultural", "Sports", "Career"
+  tags               String[] @default([])  // e.g. ["Programming", "Hackathon", "Free"]
+  date               DateTime
+  time               String
+  venue              String
+  registrationFee    Decimal     @db.Decimal(10, 2)
+  bannerImage        String?
+  registrationDeadline DateTime
+  capacity           Int
+  status             EventStatus @default(DRAFT)
+
+  clubId             String
+  club               Club        @relation(fields: [clubId], references: [id], onDelete: Cascade)
+
+  registrations      Registration[]
+  attendances        Attendance[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([clubId])
+  @@index([date])
+  @@index([status])
+}
+
+model Registration {
+  id        String @id @default(cuid())
+
+  userId    String
+  eventId   String
+
+  user      User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event     Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  status    RegistrationStatus @default(PENDING)
+
+  ticketId  String? @unique
+  qrCode    String?
+
+  payment    Payment?
+  attendance Attendance?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, eventId])
+  @@index([eventId])
+  @@index([userId])
+}
+
+model Payment {
+  id             String @id @default(cuid())
+
+  registrationId String @unique
+  registration   Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+
+  amount         Decimal @db.Decimal(10, 2)
+  method         PaymentMethod @default(BKASH)
+  status         PaymentStatus @default(INITIATED)
+
+  transactionId  String? @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+}
+
+model Attendance {
+  id             String        @id @default(cuid())
+  eventId        String
+  event          Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ticketId       String        @unique
+  registrationId String?       @unique
+  registration   Registration? @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  status         String        @default("PRESENT")
+  scannedAt      DateTime      @default(now())
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@unique([eventId, userId])
+  @@index([eventId])
+  @@index([userId])
+  @@index([ticketId])
+}
+
+
+
+
+
+
+
+// ====== NOTE ============= 
+
+/*
+
+Migration : third,
+
+npx prisma migrate dev --name <new name>
+
+*/ 
+
